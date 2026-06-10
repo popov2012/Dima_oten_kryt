@@ -1,11 +1,9 @@
 name: Telemost API
 
 on:
-  # Запуск по webhook из твоего сайта
   repository_dispatch:
     types: [create_room, join_room, approve_user, reject_user, get_room]
-  
-  # Для ручного теста
+
   workflow_dispatch:
     inputs:
       action:
