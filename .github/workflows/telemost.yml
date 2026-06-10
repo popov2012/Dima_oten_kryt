@@ -1,4 +1,4 @@
-name: Telemost API
+name: ACCESS_TOKEN
 
 on:
   repository_dispatch:
