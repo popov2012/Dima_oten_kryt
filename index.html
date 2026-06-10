@@ -89,167 +89,169 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        const SUPABASE_URL = 'https://nqyhimigrauwhaxhrqey.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_-7WrHBe71EWCe3xRZvQ__Q_yic5sbW6';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        (function() {
+            const SUPABASE_URL = 'https://nqyhimigrauwhaxhrqey.supabase.co';
+            const SUPABASE_ANON_KEY = 'sb_publishable_-7WrHBe71EWCe3xRZvQ__Q_yic5sbW6';
+            const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const createForm = document.getElementById('createForm');
-        const joinForm = document.getElementById('joinForm');
+            const createForm = document.getElementById('createForm');
+            const joinForm = document.getElementById('joinForm');
 
-        document.getElementById('showCreateBtn').onclick = () => {
-            createForm.classList.remove('hidden');
-            joinForm.classList.add('hidden');
-            document.getElementById('createError').textContent = '';
-            document.getElementById('createLoading').textContent = '';
-        };
+            document.getElementById('showCreateBtn').onclick = () => {
+                createForm.classList.remove('hidden');
+                joinForm.classList.add('hidden');
+                document.getElementById('createError').textContent = '';
+                document.getElementById('createLoading').textContent = '';
+            };
 
-        document.getElementById('showJoinBtn').onclick = () => {
-            joinForm.classList.remove('hidden');
-            createForm.classList.add('hidden');
-            document.getElementById('joinError').textContent = '';
-            document.getElementById('joinLoading').textContent = '';
-        };
+            document.getElementById('showJoinBtn').onclick = () => {
+                joinForm.classList.remove('hidden');
+                createForm.classList.add('hidden');
+                document.getElementById('joinError').textContent = '';
+                document.getElementById('joinLoading').textContent = '';
+            };
 
-        document.getElementById('createBtn').onclick = async () => {
-            const roomName = document.getElementById('createRoomName').value.trim();
-            const password = document.getElementById('createPassword').value;
-            const errorDiv = document.getElementById('createError');
-            const loadingDiv = document.getElementById('createLoading');
+            document.getElementById('createBtn').onclick = async () => {
+                const roomName = document.getElementById('createRoomName').value.trim();
+                const password = document.getElementById('createPassword').value;
+                const errorDiv = document.getElementById('createError');
+                const loadingDiv = document.getElementById('createLoading');
 
-            errorDiv.textContent = '';
-            loadingDiv.textContent = '⏳ Проверка...';
+                errorDiv.textContent = '';
+                loadingDiv.textContent = '⏳ Проверка...';
 
-            if (!roomName || !password) {
-                errorDiv.textContent = 'Заполните все поля';
-                loadingDiv.textContent = '';
-                return;
-            }
-
-            if (roomName.length < 3) {
-                errorDiv.textContent = 'Название минимум 3 символа';
-                loadingDiv.textContent = '';
-                return;
-            }
-
-            try {
-                const userId = crypto.randomUUID();
-
-                const { data: existing } = await supabase
-                    .from('rooms')
-                    .select('id')
-                    .eq('id', roomName)
-                    .maybeSingle();
-
-                if (existing) {
-                    errorDiv.textContent = '❌ Комната с таким названием уже существует';
+                if (!roomName || !password) {
+                    errorDiv.textContent = 'Заполните все поля';
                     loadingDiv.textContent = '';
                     return;
                 }
 
-                loadingDiv.textContent = '⏳ Создание комнаты...';
-
-                const { error: roomError } = await supabase
-                    .from('rooms')
-                    .insert([{ 
-                        id: roomName, 
-                        password: password, 
-                        admin_id: userId,
-                        created_at: new Date().toISOString()
-                    }]);
-
-                if (roomError) throw roomError;
-
-                loadingDiv.textContent = '⏳ Настройка админа...';
-
-                await supabase
-                    .from('waiting')
-                    .insert([{ 
-                        room_id: roomName, 
-                        user_id: userId, 
-                        status: 'approved' 
-                    }]);
-
-                loadingDiv.textContent = '✅ Перенаправление...';
-
-                setTimeout(() => {
-                    window.location.href = `admin.html?room=${encodeURIComponent(roomName)}&userId=${encodeURIComponent(userId)}`;
-                }, 500);
-
-            } catch (err) {
-                console.error(err);
-                errorDiv.textContent = 'Ошибка: ' + err.message;
-                loadingDiv.textContent = '';
-            }
-        };
-
-        document.getElementById('joinBtn').onclick = async () => {
-            const roomName = document.getElementById('joinRoomName').value.trim();
-            const password = document.getElementById('joinPassword').value;
-            const errorDiv = document.getElementById('joinError');
-            const loadingDiv = document.getElementById('joinLoading');
-
-            errorDiv.textContent = '';
-            loadingDiv.textContent = '⏳ Проверка...';
-
-            if (!roomName || !password) {
-                errorDiv.textContent = 'Заполните все поля';
-                loadingDiv.textContent = '';
-                return;
-            }
-
-            try {
-                const { data: room, error: roomError } = await supabase
-                    .from('rooms')
-                    .select('*')
-                    .eq('id', roomName)
-                    .maybeSingle();
-
-                if (roomError) throw roomError;
-
-                if (!room) {
-                    errorDiv.textContent = '❌ Комната не найдена';
+                if (roomName.length < 3) {
+                    errorDiv.textContent = 'Название минимум 3 символа';
                     loadingDiv.textContent = '';
                     return;
                 }
 
-                if (room.password !== password) {
-                    errorDiv.textContent = '❌ Неверный пароль';
+                try {
+                    const userId = crypto.randomUUID();
+
+                    const { data: existing } = await _supabase
+                        .from('rooms')
+                        .select('id')
+                        .eq('id', roomName)
+                        .maybeSingle();
+
+                    if (existing) {
+                        errorDiv.textContent = '❌ Комната с таким названием уже существует';
+                        loadingDiv.textContent = '';
+                        return;
+                    }
+
+                    loadingDiv.textContent = '⏳ Создание комнаты...';
+
+                    const { error: roomError } = await _supabase
+                        .from('rooms')
+                        .insert([{ 
+                            id: roomName, 
+                            password: password, 
+                            admin_id: userId,
+                            created_at: new Date().toISOString()
+                        }]);
+
+                    if (roomError) throw roomError;
+
+                    loadingDiv.textContent = '⏳ Настройка админа...';
+
+                    await _supabase
+                        .from('waiting')
+                        .insert([{ 
+                            room_id: roomName, 
+                            user_id: userId, 
+                            status: 'approved' 
+                        }]);
+
+                    loadingDiv.textContent = '✅ Перенаправление...';
+
+                    setTimeout(() => {
+                        window.location.href = `admin.html?room=${encodeURIComponent(roomName)}&userId=${encodeURIComponent(userId)}`;
+                    }, 500);
+
+                } catch (err) {
+                    console.error(err);
+                    errorDiv.textContent = 'Ошибка: ' + err.message;
+                    loadingDiv.textContent = '';
+                }
+            };
+
+            document.getElementById('joinBtn').onclick = async () => {
+                const roomName = document.getElementById('joinRoomName').value.trim();
+                const password = document.getElementById('joinPassword').value;
+                const errorDiv = document.getElementById('joinError');
+                const loadingDiv = document.getElementById('joinLoading');
+
+                errorDiv.textContent = '';
+                loadingDiv.textContent = '⏳ Проверка...';
+
+                if (!roomName || !password) {
+                    errorDiv.textContent = 'Заполните все поля';
                     loadingDiv.textContent = '';
                     return;
                 }
 
-                loadingDiv.textContent = '⏳ Вход...';
+                try {
+                    const { data: room, error: roomError } = await _supabase
+                        .from('rooms')
+                        .select('*')
+                        .eq('id', roomName)
+                        .maybeSingle();
 
-                const userId = crypto.randomUUID();
+                    if (roomError) throw roomError;
 
-                await supabase
-                    .from('waiting')
-                    .insert([{ 
-                        room_id: roomName, 
-                        user_id: userId, 
-                        status: 'waiting',
-                        created_at: new Date().toISOString()
-                    }]);
+                    if (!room) {
+                        errorDiv.textContent = '❌ Комната не найдена';
+                        loadingDiv.textContent = '';
+                        return;
+                    }
 
-                loadingDiv.textContent = '✅ Перенаправление...';
+                    if (room.password !== password) {
+                        errorDiv.textContent = '❌ Неверный пароль';
+                        loadingDiv.textContent = '';
+                        return;
+                    }
 
-                setTimeout(() => {
-                    window.location.href = `waiting.html?room=${encodeURIComponent(roomName)}&userId=${encodeURIComponent(userId)}`;
-                }, 500);
+                    loadingDiv.textContent = '⏳ Вход...';
 
-            } catch (err) {
-                console.error(err);
-                errorDiv.textContent = 'Ошибка: ' + err.message;
-                loadingDiv.textContent = '';
+                    const userId = crypto.randomUUID();
+
+                    await _supabase
+                        .from('waiting')
+                        .insert([{ 
+                            room_id: roomName, 
+                            user_id: userId, 
+                            status: 'waiting',
+                            created_at: new Date().toISOString()
+                        }]);
+
+                    loadingDiv.textContent = '✅ Перенаправление...';
+
+                    setTimeout(() => {
+                        window.location.href = `waiting.html?room=${encodeURIComponent(roomName)}&userId=${encodeURIComponent(userId)}`;
+                    }, 500);
+
+                } catch (err) {
+                    console.error(err);
+                    errorDiv.textContent = 'Ошибка: ' + err.message;
+                    loadingDiv.textContent = '';
+                }
+            };
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomFromUrl = urlParams.get('room');
+            if (roomFromUrl) {
+                document.getElementById('joinRoomName').value = roomFromUrl;
+                document.getElementById('showJoinBtn').click();
             }
-        };
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const roomFromUrl = urlParams.get('room');
-        if (roomFromUrl) {
-            document.getElementById('joinRoomName').value = roomFromUrl;
-            document.getElementById('showJoinBtn').click();
-        }
+        })();
     </script>
 </body>
 </html>

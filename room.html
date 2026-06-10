@@ -69,34 +69,36 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        const SUPABASE_URL = 'https://nqyhimigrauwhaxhrqey.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_-7WrHBe71EWCe3xRZvQ__Q_yic5sbW6';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        (function() {
+            const SUPABASE_URL = 'https://nqyhimigrauwhaxhrqey.supabase.co';
+            const SUPABASE_ANON_KEY = 'sb_publishable_-7WrHBe71EWCe3xRZvQ__Q_yic5sbW6';
+            const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const roomName = urlParams.get('room');
-        const userId = urlParams.get('userId');
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomName = urlParams.get('room');
+            const userId = urlParams.get('userId');
 
-        document.getElementById('roomName').innerHTML = 'Комната: <strong>' + roomName + '</strong>';
+            document.getElementById('roomName').innerHTML = 'Комната: <strong>' + roomName + '</strong>';
 
-        function exitRoom() {
-            window.location.href = 'index.html';
-        }
+            window.exitRoom = () => {
+                window.location.href = 'index.html';
+            };
 
-        setInterval(async () => {
-            const { data: room } = await supabase
-                .from('rooms')
-                .select('id')
-                .eq('id', roomName)
-                .maybeSingle();
+            setInterval(async () => {
+                const { data: room } = await _supabase
+                    .from('rooms')
+                    .select('id')
+                    .eq('id', roomName)
+                    .maybeSingle();
 
-            if (!room) {
-                document.getElementById('warning').innerHTML = '⚠️ Комната закрыта администратором. Через 5 секунд будет выход...';
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 5000);
-            }
-        }, 5000);
+                if (!room) {
+                    document.getElementById('warning').innerHTML = '⚠️ Комната закрыта администратором. Через 5 секунд будет выход...';
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 5000);
+                }
+            }, 5000);
+        })();
     </script>
 </body>
 </html>

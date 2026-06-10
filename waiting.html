@@ -62,60 +62,62 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        const SUPABASE_URL = 'https://nqyhimigrauwhaxhrqey.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_-7WrHBe71EWCe3xRZvQ__Q_yic5sbW6';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        (function() {
+            const SUPABASE_URL = 'https://nqyhimigrauwhaxhrqey.supabase.co';
+            const SUPABASE_ANON_KEY = 'sb_publishable_-7WrHBe71EWCe3xRZvQ__Q_yic5sbW6';
+            const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const roomName = urlParams.get('room');
-        const userId = urlParams.get('userId');
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomName = urlParams.get('room');
+            const userId = urlParams.get('userId');
 
-        async function checkStatus() {
-            try {
-                const { data, error } = await supabase
-                    .from('waiting')
-                    .select('status')
-                    .eq('user_id', userId)
-                    .eq('room_id', roomName)
-                    .maybeSingle();
+            async function checkStatus() {
+                try {
+                    const { data, error } = await _supabase
+                        .from('waiting')
+                        .select('status')
+                        .eq('user_id', userId)
+                        .eq('room_id', roomName)
+                        .maybeSingle();
 
-                if (error) throw error;
+                    if (error) throw error;
 
-                if (data) {
-                    if (data.status === 'approved') {
-                        document.getElementById('status').innerHTML = '✅ Доступ разрешен! Перенаправление...';
-                        document.getElementById('status').className = 'approved';
-                        document.getElementById('spinner').style.display = 'none';
-                        setTimeout(() => {
-                            window.location.href = `room.html?room=${encodeURIComponent(roomName)}&userId=${encodeURIComponent(userId)}`;
-                        }, 1000);
-                    } else if (data.status === 'rejected') {
-                        document.getElementById('status').innerHTML = '❌ Доступ отклонён администратором';
+                    if (data) {
+                        if (data.status === 'approved') {
+                            document.getElementById('status').innerHTML = '✅ Доступ разрешен! Перенаправление...';
+                            document.getElementById('status').className = 'approved';
+                            document.getElementById('spinner').style.display = 'none';
+                            setTimeout(() => {
+                                window.location.href = `room.html?room=${encodeURIComponent(roomName)}&userId=${encodeURIComponent(userId)}`;
+                            }, 1000);
+                        } else if (data.status === 'rejected') {
+                            document.getElementById('status').innerHTML = '❌ Доступ отклонён администратором';
+                            document.getElementById('status').className = 'rejected';
+                            document.getElementById('spinner').style.display = 'none';
+                            document.getElementById('refreshBtn').style.display = 'inline-block';
+                        }
+                    }
+
+                    const { data: room } = await _supabase
+                        .from('rooms')
+                        .select('id')
+                        .eq('id', roomName)
+                        .maybeSingle();
+
+                    if (!room) {
+                        document.getElementById('status').innerHTML = '🚪 Комната закрыта администратором';
                         document.getElementById('status').className = 'rejected';
                         document.getElementById('spinner').style.display = 'none';
-                        document.getElementById('refreshBtn').style.display = 'inline-block';
                     }
+
+                } catch (err) {
+                    console.error('Ошибка проверки:', err);
                 }
-
-                const { data: room } = await supabase
-                    .from('rooms')
-                    .select('id')
-                    .eq('id', roomName)
-                    .maybeSingle();
-
-                if (!room) {
-                    document.getElementById('status').innerHTML = '🚪 Комната закрыта администратором';
-                    document.getElementById('status').className = 'rejected';
-                    document.getElementById('spinner').style.display = 'none';
-                }
-
-            } catch (err) {
-                console.error('Ошибка проверки:', err);
             }
-        }
 
-        setInterval(checkStatus, 2000);
-        checkStatus();
+            setInterval(checkStatus, 2000);
+            checkStatus();
+        })();
     </script>
 </body>
 </html>
