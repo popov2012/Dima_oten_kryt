@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -39,8 +39,17 @@
         }
         h2 { color: #333; margin-bottom: 20px; }
         #status { font-size: 16px; color: #666; margin-top: 20px; }
-        .approved { color: #27ae60; }
-        .rejected { color: #e74c3c; }
+        .approved { color: #27ae60; font-weight: bold; }
+        .rejected { color: #e74c3c; font-weight: bold; }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #764ba2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -48,38 +57,60 @@
         <h2>⏳ Зал ожидания</h2>
         <div class="spinner" id="spinner"></div>
         <p id="status">Ожидание подтверждения от администратора...</p>
+        <button id="refreshBtn" style="display: none;" onclick="checkStatus()">🔄 Проверить</button>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
+        const SUPABASE_URL = 'https://nqyhimigrauwhaxhrqey.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_-7WrHBe71EWCe3xRZvQ__Q_yic5sbW6';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         const urlParams = new URLSearchParams(window.location.search);
         const roomName = urlParams.get('room');
         const userId = urlParams.get('userId');
 
-        function checkStatus() {
-            const waiting = JSON.parse(localStorage.getItem(`waiting_${roomName}`) || '[]');
-            const user = waiting.find(u => u.userId === userId);
+        async function checkStatus() {
+            try {
+                const { data, error } = await supabase
+                    .from('waiting')
+                    .select('status')
+                    .eq('user_id', userId)
+                    .eq('room_id', roomName)
+                    .maybeSingle();
 
-            if (user) {
-                if (user.status === 'approved') {
-                    document.getElementById('status').innerHTML = '✅ Доступ разрешен! Перенаправление...';
-                    document.getElementById('status').className = 'approved';
-                    document.getElementById('spinner').style.display = 'none';
-                    setTimeout(() => {
-                        window.location.href = `room.html?room=${encodeURIComponent(roomName)}&userId=${userId}`;
-                    }, 1000);
-                } else if (user.status === 'rejected') {
-                    document.getElementById('status').innerHTML = '❌ Доступ отклонён администратором';
+                if (error) throw error;
+
+                if (data) {
+                    if (data.status === 'approved') {
+                        document.getElementById('status').innerHTML = '✅ Доступ разрешен! Перенаправление...';
+                        document.getElementById('status').className = 'approved';
+                        document.getElementById('spinner').style.display = 'none';
+                        setTimeout(() => {
+                            window.location.href = `room.html?room=${encodeURIComponent(roomName)}&userId=${encodeURIComponent(userId)}`;
+                        }, 1000);
+                    } else if (data.status === 'rejected') {
+                        document.getElementById('status').innerHTML = '❌ Доступ отклонён администратором';
+                        document.getElementById('status').className = 'rejected';
+                        document.getElementById('spinner').style.display = 'none';
+                        document.getElementById('refreshBtn').style.display = 'inline-block';
+                    }
+                }
+
+                const { data: room } = await supabase
+                    .from('rooms')
+                    .select('id')
+                    .eq('id', roomName)
+                    .maybeSingle();
+
+                if (!room) {
+                    document.getElementById('status').innerHTML = '🚪 Комната закрыта администратором';
                     document.getElementById('status').className = 'rejected';
                     document.getElementById('spinner').style.display = 'none';
                 }
-            }
 
-            // Проверяем, не закрыта ли комната
-            const rooms = JSON.parse(localStorage.getItem('rooms') || '{}');
-            if (!rooms[roomName]) {
-                document.getElementById('status').innerHTML = '🚪 Комната закрыта администратором';
-                document.getElementById('status').className = 'rejected';
-                document.getElementById('spinner').style.display = 'none';
+            } catch (err) {
+                console.error('Ошибка проверки:', err);
             }
         }
 

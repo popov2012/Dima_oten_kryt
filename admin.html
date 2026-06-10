@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
@@ -97,6 +97,12 @@
             margin-left: 10px;
         }
         h3 { margin: 20px 0 10px 0; color: #333; }
+        .status-badge {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            background: #e0e0e0;
+        }
     </style>
 </head>
 <body>
@@ -116,83 +122,93 @@
         <button class="danger" onclick="closeRoom()">🚪 Закрыть комнату (удалить)</button>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
+        const SUPABASE_URL = 'https://nqyhimigrauwhaxhrqey.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_-7WrHBe71EWCe3xRZvQ__Q_yic5sbW6';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         const urlParams = new URLSearchParams(window.location.search);
         const roomName = urlParams.get('room');
 
         document.getElementById('roomName').textContent = roomName;
-        document.getElementById('inviteLink').textContent = window.location.origin + '/index.html?room=' + encodeURIComponent(roomName);
+        document.getElementById('inviteLink').textContent = window.location.origin + window.location.pathname.replace('admin.html', 'index.html') + '?room=' + encodeURIComponent(roomName);
 
         function copyLink() {
             navigator.clipboard.writeText(document.getElementById('inviteLink').textContent);
             alert('Ссылка скопирована!');
         }
 
-        function loadWaiting() {
-            const waiting = JSON.parse(localStorage.getItem(`waiting_${roomName}`) || '[]');
-            const waitingUsers = waiting.filter(u => u.status === 'waiting');
+        async function loadWaiting() {
+            const { data: users, error } = await supabase
+                .from('waiting')
+                .select('*')
+                .eq('room_id', roomName)
+                .eq('status', 'waiting')
+                .order('created_at', { ascending: true });
 
             const listDiv = document.getElementById('waitingList');
-            if (waitingUsers.length === 0) {
+            if (!users || users.length === 0) {
                 listDiv.innerHTML = '<div class="empty">✨ Нет ожидающих пользователей</div>';
                 return;
             }
 
             listDiv.innerHTML = '';
-            waitingUsers.forEach(user => {
+            users.forEach(user => {
                 const div = document.createElement('div');
                 div.className = 'user-card';
                 div.innerHTML = `
                     <div>
                         <div>👤 Пользователь</div>
-                        <div class="user-id">ID: ${user.userId}</div>
+                        <div class="user-id">ID: ${user.user_id.substring(0, 8)}...</div>
+                        <div class="status-badge">⏳ ожидает</div>
                     </div>
                     <div>
-                        <button class="approve" onclick="handleUser('${user.userId}', 'approved')">✅ Подтвердить</button>
-                        <button class="reject" onclick="handleUser('${user.userId}', 'rejected')">❌ Отказать</button>
+                        <button class="approve" onclick="handleUser('${user.user_id}', 'approved')">✅ Подтвердить</button>
+                        <button class="reject" onclick="handleUser('${user.user_id}', 'rejected')">❌ Отказать</button>
                     </div>
                 `;
                 listDiv.appendChild(div);
             });
         }
 
-        function handleUser(userId, status) {
-            const waiting = JSON.parse(localStorage.getItem(`waiting_${roomName}`) || '[]');
-            const index = waiting.findIndex(u => u.userId === userId);
-            if (index !== -1) {
-                waiting[index].status = status;
-                localStorage.setItem(`waiting_${roomName}`, JSON.stringify(waiting));
+        async function handleUser(userId, status) {
+            const { error } = await supabase
+                .from('waiting')
+                .update({ status: status })
+                .eq('user_id', userId)
+                .eq('room_id', roomName);
+
+            if (error) {
+                console.error('Ошибка:', error);
+                alert('Ошибка при обработке: ' + error.message);
+            } else {
                 loadWaiting();
             }
         }
 
-        function closeRoom() {
-            if (confirm('⚠️ Вы уверены? Комната будет удалена.')) {
-                const rooms = JSON.parse(localStorage.getItem('rooms') || '{}');
-                delete rooms[roomName];
-                localStorage.setItem('rooms', JSON.stringify(rooms));
-                localStorage.removeItem(`waiting_${roomName}`);
+        async function closeRoom() {
+            if (confirm('⚠️ Вы уверены? Комната будет удалена, и все участники будут отключены.')) {
+                await supabase.from('waiting').delete().eq('room_id', roomName);
+                await supabase.from('rooms').delete().eq('id', roomName);
                 window.location.href = 'index.html';
             }
         }
 
-        setInterval(loadWaiting, 2000);
+        const channel = supabase
+            .channel(`waiting_${roomName}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'waiting',
+                filter: `room_id=eq.${roomName}`
+            }, () => {
+                loadWaiting();
+            })
+            .subscribe();
+
         loadWaiting();
-
-        let lastActivity = Date.now();
-        setInterval(() => {
-            if (Date.now() - lastActivity > 600000) {
-                const rooms = JSON.parse(localStorage.getItem('rooms') || '{}');
-                delete rooms[roomName];
-                localStorage.setItem('rooms', JSON.stringify(rooms));
-                localStorage.removeItem(`waiting_${roomName}`);
-                window.location.href = 'index.html';
-            }
-        }, 60000);
-
-        ['mousemove', 'click', 'keypress'].forEach(event => {
-            document.addEventListener(event, () => lastActivity = Date.now());
-        });
+        setInterval(loadWaiting, 5000);
     </script>
 </body>
 </html>

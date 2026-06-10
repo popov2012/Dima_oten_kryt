@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -52,6 +52,7 @@
             margin-top: 20px;
             font-size: 14px;
         }
+        .warning { color: #e74c3c; margin-top: 10px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -59,15 +60,22 @@
         <h1>🎬 Вы в телемосте!</h1>
         <div class="video-placeholder">
             🎥 Зона видеосвязи<br>
-            <small>(здесь будет WebRTC)</small>
+            <small>Здесь будет WebRTC (видео/аудио)</small>
         </div>
         <button onclick="exitRoom()">🚪 Покинуть комнату</button>
         <div class="room-name" id="roomName"></div>
+        <div class="warning" id="warning"></div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
+        const SUPABASE_URL = 'https://nqyhimigrauwhaxhrqey.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_-7WrHBe71EWCe3xRZvQ__Q_yic5sbW6';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         const urlParams = new URLSearchParams(window.location.search);
         const roomName = urlParams.get('room');
+        const userId = urlParams.get('userId');
 
         document.getElementById('roomName').innerHTML = 'Комната: <strong>' + roomName + '</strong>';
 
@@ -75,11 +83,18 @@
             window.location.href = 'index.html';
         }
 
-        setInterval(() => {
-            const rooms = JSON.parse(localStorage.getItem('rooms') || '{}');
-            if (!rooms[roomName]) {
-                alert('🚪 Комната закрыта администратором');
-                window.location.href = 'index.html';
+        setInterval(async () => {
+            const { data: room } = await supabase
+                .from('rooms')
+                .select('id')
+                .eq('id', roomName)
+                .maybeSingle();
+
+            if (!room) {
+                document.getElementById('warning').innerHTML = '⚠️ Комната закрыта администратором. Через 5 секунд будет выход...';
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 5000);
             }
         }, 5000);
     </script>

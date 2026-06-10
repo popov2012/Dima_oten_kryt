@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -53,6 +53,7 @@
         .error { color: #e74c3c; margin-top: 12px; font-size: 14px; }
         .card-title { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #333; }
         .info { font-size: 12px; color: #999; margin-top: 20px; }
+        .loading { color: #666; margin-top: 10px; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -71,6 +72,7 @@
             <input type="password" id="createPassword" placeholder="Пароль">
             <button class="create-btn" id="createBtn">Создать</button>
             <div id="createError" class="error"></div>
+            <div id="createLoading" class="loading"></div>
         </div>
 
         <div id="joinForm" class="hidden">
@@ -79,95 +81,167 @@
             <input type="password" id="joinPassword" placeholder="Пароль">
             <button class="join-btn" id="joinBtn">Присоединиться</button>
             <div id="joinError" class="error"></div>
+            <div id="joinLoading" class="loading"></div>
         </div>
 
-        <div class="info">💡 Комнаты хранятся в браузере админа. Пока админ онлайн — комната работает.</div>
+        <div class="info">💡 Комнаты создаются в облаке. Админ подтверждает вход.</div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Показываем формы
+        const SUPABASE_URL = 'https://nqyhimigrauwhaxhrqey.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_-7WrHBe71EWCe3xRZvQ__Q_yic5sbW6';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const createForm = document.getElementById('createForm');
+        const joinForm = document.getElementById('joinForm');
+
         document.getElementById('showCreateBtn').onclick = () => {
-            document.getElementById('createForm').classList.remove('hidden');
-            document.getElementById('joinForm').classList.add('hidden');
+            createForm.classList.remove('hidden');
+            joinForm.classList.add('hidden');
+            document.getElementById('createError').textContent = '';
+            document.getElementById('createLoading').textContent = '';
         };
 
         document.getElementById('showJoinBtn').onclick = () => {
-            document.getElementById('joinForm').classList.remove('hidden');
-            document.getElementById('createForm').classList.add('hidden');
+            joinForm.classList.remove('hidden');
+            createForm.classList.add('hidden');
+            document.getElementById('joinError').textContent = '';
+            document.getElementById('joinLoading').textContent = '';
         };
 
-        // Создание комнаты
-        document.getElementById('createBtn').onclick = () => {
+        document.getElementById('createBtn').onclick = async () => {
             const roomName = document.getElementById('createRoomName').value.trim();
             const password = document.getElementById('createPassword').value;
             const errorDiv = document.getElementById('createError');
+            const loadingDiv = document.getElementById('createLoading');
+
             errorDiv.textContent = '';
+            loadingDiv.textContent = '⏳ Проверка...';
 
             if (!roomName || !password) {
                 errorDiv.textContent = 'Заполните все поля';
+                loadingDiv.textContent = '';
                 return;
             }
 
-            const rooms = JSON.parse(localStorage.getItem('rooms') || '{}');
-            if (rooms[roomName]) {
-                errorDiv.textContent = 'Комната уже существует';
+            if (roomName.length < 3) {
+                errorDiv.textContent = 'Название минимум 3 символа';
+                loadingDiv.textContent = '';
                 return;
             }
 
-            const adminId = Math.random().toString(36).substring(2, 10);
-            rooms[roomName] = {
-                password: password,
-                adminId: adminId,
-                created: Date.now(),
-                users: []
-            };
-            localStorage.setItem('rooms', JSON.stringify(rooms));
+            try {
+                const userId = crypto.randomUUID();
 
-            sessionStorage.setItem('admin_session', JSON.stringify({
-                roomName: roomName,
-                adminId: adminId
-            }));
+                const { data: existing } = await supabase
+                    .from('rooms')
+                    .select('id')
+                    .eq('id', roomName)
+                    .maybeSingle();
 
-            window.location.href = `admin.html?room=${encodeURIComponent(roomName)}`;
+                if (existing) {
+                    errorDiv.textContent = '❌ Комната с таким названием уже существует';
+                    loadingDiv.textContent = '';
+                    return;
+                }
+
+                loadingDiv.textContent = '⏳ Создание комнаты...';
+
+                const { error: roomError } = await supabase
+                    .from('rooms')
+                    .insert([{ 
+                        id: roomName, 
+                        password: password, 
+                        admin_id: userId,
+                        created_at: new Date().toISOString()
+                    }]);
+
+                if (roomError) throw roomError;
+
+                loadingDiv.textContent = '⏳ Настройка админа...';
+
+                await supabase
+                    .from('waiting')
+                    .insert([{ 
+                        room_id: roomName, 
+                        user_id: userId, 
+                        status: 'approved' 
+                    }]);
+
+                loadingDiv.textContent = '✅ Перенаправление...';
+
+                setTimeout(() => {
+                    window.location.href = `admin.html?room=${encodeURIComponent(roomName)}&userId=${encodeURIComponent(userId)}`;
+                }, 500);
+
+            } catch (err) {
+                console.error(err);
+                errorDiv.textContent = 'Ошибка: ' + err.message;
+                loadingDiv.textContent = '';
+            }
         };
 
-        // Присоединение к комнате
-        document.getElementById('joinBtn').onclick = () => {
+        document.getElementById('joinBtn').onclick = async () => {
             const roomName = document.getElementById('joinRoomName').value.trim();
             const password = document.getElementById('joinPassword').value;
             const errorDiv = document.getElementById('joinError');
+            const loadingDiv = document.getElementById('joinLoading');
+
             errorDiv.textContent = '';
+            loadingDiv.textContent = '⏳ Проверка...';
 
             if (!roomName || !password) {
                 errorDiv.textContent = 'Заполните все поля';
+                loadingDiv.textContent = '';
                 return;
             }
 
-            const rooms = JSON.parse(localStorage.getItem('rooms') || '{}');
-            const room = rooms[roomName];
+            try {
+                const { data: room, error: roomError } = await supabase
+                    .from('rooms')
+                    .select('*')
+                    .eq('id', roomName)
+                    .maybeSingle();
 
-            if (!room) {
-                errorDiv.textContent = 'Комната не найдена';
-                return;
+                if (roomError) throw roomError;
+
+                if (!room) {
+                    errorDiv.textContent = '❌ Комната не найдена';
+                    loadingDiv.textContent = '';
+                    return;
+                }
+
+                if (room.password !== password) {
+                    errorDiv.textContent = '❌ Неверный пароль';
+                    loadingDiv.textContent = '';
+                    return;
+                }
+
+                loadingDiv.textContent = '⏳ Вход...';
+
+                const userId = crypto.randomUUID();
+
+                await supabase
+                    .from('waiting')
+                    .insert([{ 
+                        room_id: roomName, 
+                        user_id: userId, 
+                        status: 'waiting',
+                        created_at: new Date().toISOString()
+                    }]);
+
+                loadingDiv.textContent = '✅ Перенаправление...';
+
+                setTimeout(() => {
+                    window.location.href = `waiting.html?room=${encodeURIComponent(roomName)}&userId=${encodeURIComponent(userId)}`;
+                }, 500);
+
+            } catch (err) {
+                console.error(err);
+                errorDiv.textContent = 'Ошибка: ' + err.message;
+                loadingDiv.textContent = '';
             }
-
-            if (room.password !== password) {
-                errorDiv.textContent = 'Неверный пароль';
-                return;
-            }
-
-            const userId = Math.random().toString(36).substring(2, 10);
-
-            sessionStorage.setItem('user_session', JSON.stringify({
-                roomName: roomName,
-                userId: userId
-            }));
-
-            const waiting = JSON.parse(localStorage.getItem(`waiting_${roomName}`) || '[]');
-            waiting.push({ userId: userId, status: 'waiting', timestamp: Date.now() });
-            localStorage.setItem(`waiting_${roomName}`, JSON.stringify(waiting));
-
-            window.location.href = `waiting.html?room=${encodeURIComponent(roomName)}&userId=${userId}`;
         };
 
         const urlParams = new URLSearchParams(window.location.search);
